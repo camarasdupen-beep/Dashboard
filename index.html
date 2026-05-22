@@ -187,7 +187,7 @@
       <div class="card-title">Rentabilidad anual <span class="card-subtitle" id="anual-periodo">acumulado</span></div>
 
       <!-- métricas anuales -->
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.9rem;margin-bottom:1.4rem" id="anual-metrics"></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:.9rem;margin-bottom:1.4rem" id="anual-metrics"></div>
 
       <!-- barra de progreso anual -->
       <div style="margin-bottom:1.2rem">
@@ -468,6 +468,8 @@ function drawAnual(){
 
   // Calcular totales
   let totVn=0,totCb=0,totGf=0,totNeto=0,totTk=0,mesesConGf=0;
+  // Inflación acumulada compuesta: (1+i1)*(1+i2)*... - 1
+  let infAcumFactor=1, mesesConInf=0;
   const rows=saved.map(s=>{
     const d=s.data;
     const vn=(d.vb||0)-(d.re||0)-(d.de||0);
@@ -476,28 +478,40 @@ function drawAnual(){
     const inf=d.inf||0, rentReal=inf?(rent-(inf/100)):null;
     totVn+=vn; totCb+=cb; totGf+=gf; totNeto+=neto; totTk+=(d.tk||0);
     if(gf>0) mesesConGf++;
+    if(inf>0){ infAcumFactor*=(1+inf/100); mesesConInf++; }
     return {year:s.year,month:s.month,vn,cb,gf,neto,mb,rent,inf,rentReal};
   });
 
+  const infAcum = mesesConInf>0 ? infAcumFactor-1 : null;
   const totMb=totVn?(totVn-totCb)/totVn:0;
   const totRent=totVn?totNeto/totVn:0;
+  const totRentReal = infAcum!==null ? totRent-infAcum : null;
   const meses=saved.length;
   const primerMes=MONTHS[saved[0].month].substring(0,3)+' '+saved[0].year;
   const ultMes=MONTHS[saved[saved.length-1].month].substring(0,3)+' '+saved[saved.length-1].year;
   periodoEl.textContent=`${primerMes} – ${ultMes} · ${meses} meses`;
 
-  // Tarjetas resumen
+  // Tarjetas resumen — ahora 5 si hay inflación, 4 si no
   const cards=[
-    {lbl:'Ventas acumuladas',val:fmt(totVn),color:'var(--forest)'},
-    {lbl:'Ganancia acumulada',val:fmt(totNeto),color:totNeto>=0?'var(--sage)':'var(--rust)'},
-    {lbl:'Margen bruto prom.',val:fp(totMb),color:totMb>.35?'var(--sage)':'var(--gold)'},
-    {lbl:'Rentabilidad anual',val:fp(totRent),color:totRent>.1?'var(--sage)':totRent>0?'var(--gold)':'var(--rust)'},
+    {lbl:'Ventas acumuladas',   val:fmt(totVn),   color:'var(--forest)'},
+    {lbl:'Ganancia acumulada',  val:fmt(totNeto), color:totNeto>=0?'var(--sage)':'var(--rust)'},
+    {lbl:'Margen bruto prom.',  val:fp(totMb),    color:totMb>.35?'var(--sage)':'var(--gold)'},
+    {lbl:'Rent. nominal acum.', val:fp(totRent),  color:totRent>.1?'var(--sage)':totRent>0?'var(--gold)':'var(--rust)'},
   ];
+  if(infAcum!==null) cards.push(
+    {lbl:`Inflación acum. (${mesesConInf}m)`, val:fp(infAcum), color:'var(--bark)', sub:true},
+  );
+  if(totRentReal!==null) cards.push(
+    {lbl:'Rent. real acum.', val:fp(totRentReal), color:totRentReal>0?'var(--sage)':'var(--rust)', highlight:true},
+  );
   cards.forEach(c=>{
     const d=document.createElement('div');
-    d.style.cssText='background:var(--parch);border-radius:11px;padding:.85rem;text-align:center';
-    d.innerHTML=`<div style="font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:.35rem">${c.lbl}</div>
-    <div style="font-family:'Playfair Display',serif;font-size:1.25rem;font-weight:700;color:${c.color}">${c.val}</div>`;
+    const bg=c.highlight?'background:var(--forest)':'background:var(--parch)';
+    const lblColor=c.highlight?'rgba(255,255,255,.5)':'var(--muted)';
+    d.style.cssText=`${bg};border-radius:11px;padding:.85rem;text-align:center;${c.highlight?'border:2px solid var(--sage)':''}`;
+    d.innerHTML=`<div style="font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;color:${lblColor};margin-bottom:.35rem">${c.lbl}</div>
+    <div style="font-family:'Playfair Display',serif;font-size:1.2rem;font-weight:700;color:${c.color}">${c.val}</div>
+    ${c.highlight&&totRentReal!==null?`<div style="font-size:.68rem;color:${totRentReal>0?'var(--sage-lt)':'var(--rust)'};margin-top:.2rem">${totRentReal>0?'✓ le ganó a la inflación':'✗ no le ganó a la inflación'}</div>`:''}`;
     metricsEl.appendChild(d);
   });
 
@@ -505,9 +519,28 @@ function drawAnual(){
   const rentPct=Math.min(Math.max(totRent,0),0.25);
   const barW=(rentPct/0.20)*100;
   const barColor=totRent>=.15?'var(--sage)':totRent>=.08?'var(--gold)':'var(--rust)';
-  $('anual-rent-val').textContent=fp(totRent)+(mesesConGf<meses?' (faltan gastos fijos en algunos meses)':'');
+  let rentLabel=fp(totRent);
+  if(mesesConGf<meses) rentLabel+=' (faltan gastos fijos en algunos meses)';
+  if(infAcum!==null) rentLabel+=` · Real: ${fp(totRentReal)} (inflación acum. ${fp(infAcum)})`;
+  $('anual-rent-val').textContent=rentLabel;
   $('anual-rent-bar').style.width=Math.min(barW,100)+'%';
   $('anual-rent-bar').style.background=barColor;
+  // segunda barra real si hay inflación
+  let barReal=$('anual-rent-bar-real');
+  if(!barReal){
+    const track=$('anual-rent-bar').parentElement;
+    barReal=document.createElement('div');
+    barReal.id='anual-rent-bar-real';
+    barReal.style.cssText='height:100%;border-radius:100px;transition:width .8s cubic-bezier(.16,1,.3,1);width:0%;margin-top:3px;opacity:.6';
+    track.appendChild(barReal);
+  }
+  if(totRentReal!==null){
+    const realW=Math.min(Math.max(totRentReal,0)/0.20*100,100);
+    barReal.style.width=realW+'%';
+    barReal.style.background=totRentReal>0?'var(--sage)':'var(--rust)';
+  } else {
+    barReal.style.width='0%';
+  }
 
   // Tabla mes a mes
   rows.forEach((r,i)=>{
