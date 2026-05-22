@@ -213,6 +213,8 @@
               <th style="font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:.35rem .6rem;text-align:right;border-bottom:1px solid var(--parch)">Ganancia</th>
               <th style="font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:.35rem .6rem;text-align:right;border-bottom:1px solid var(--parch)">Rent.</th>
               <th style="font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:.35rem .6rem;text-align:right;border-bottom:1px solid var(--parch)">Margen bruto</th>
+              <th style="font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:.35rem .6rem;text-align:right;border-bottom:1px solid var(--parch)">Inflación</th>
+              <th style="font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:.35rem .6rem;text-align:right;border-bottom:1px solid var(--parch)">Rent. real</th>
             </tr>
           </thead>
           <tbody id="anual-body"></tbody>
@@ -298,6 +300,20 @@
         <div class="ig"><label>Sueldos ($)</label><input type="number" id="i-su" placeholder="0" oninput="recalc()"></div>
         <div class="ig"><label>Servicios ($)</label><input type="number" id="i-se" placeholder="0" oninput="recalc()"></div>
         <div class="ig"><label>Otros ($)</label><input type="number" id="i-ot" placeholder="0" oninput="recalc()"></div>
+      </div>
+
+      <div class="sec-label">📉 Contexto económico</div>
+      <div class="ig2">
+        <div class="ig">
+          <label>Inflación del mes (%) <span id="inf-status" style="font-size:.6rem;opacity:.6"></span></label>
+          <div style="display:flex;gap:.4rem;align-items:center">
+            <input type="number" id="i-inf" placeholder="ej. 3.7" step="0.1" min="0" oninput="recalc()" style="flex:1">
+            <button onclick="fetchInflacion()" id="inf-btn" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.2);border-radius:6px;color:var(--white);font-size:.72rem;padding:.38rem .55rem;cursor:pointer;white-space:nowrap;transition:background .2s" title="Traer dato oficial INDEC">🔄 INDEC</button>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;padding:.5rem .6rem;background:rgba(255,255,255,.06);border-radius:7px;font-size:.74rem;color:rgba(255,255,255,.5);line-height:1.4">
+          Rent. real = nominal − inflación. Presioná 🔄 para traer el dato oficial del INDEC.
+        </div>
       </div>
 
       <button class="save-btn" onclick="saveCurrentMonth()">💾 Guardar este mes</button>
@@ -412,13 +428,13 @@ function loadIntoForm(year,month){
   const d=loadMonth(year,month)||{};
   $('i-vb').value=d.vb||''; $('i-re').value=d.re||''; $('i-de').value=d.de||'';
   $('i-cb').value=d.cb||''; $('i-tk').value=d.tk||'';
-  $('i-al').value=d.al||''; $('i-su').value=d.su||''; $('i-se').value=d.se||''; $('i-ot').value=d.ot||'';
+  $('i-al').value=d.al||''; $('i-su').value=d.su||''; $('i-se').value=d.se||''; $('i-ot').value=d.ot||''; $('i-inf').value=d.inf||'';
 }
 
 function saveCurrentMonth(){
   const data={
     vb:fv('i-vb'),re:fv('i-re'),de:fv('i-de'),cb:fv('i-cb'),tk:fv('i-tk'),
-    al:fv('i-al'),su:fv('i-su'),se:fv('i-se'),ot:fv('i-ot'),
+    al:fv('i-al'),su:fv('i-su'),se:fv('i-se'),ot:fv('i-ot'),inf:fv('i-inf'),
   };
   saveMonth(selectedYear,selectedMonth,data);
   const badge=$('saved-badge');
@@ -457,9 +473,10 @@ function drawAnual(){
     const vn=(d.vb||0)-(d.re||0)-(d.de||0);
     const cb=d.cb||0,gf=(d.al||0)+(d.su||0)+(d.se||0)+(d.ot||0);
     const neto=vn-cb-gf,mb=vn?(vn-cb)/vn:0,rent=vn?neto/vn:0;
+    const inf=d.inf||0, rentReal=inf?(rent-(inf/100)):null;
     totVn+=vn; totCb+=cb; totGf+=gf; totNeto+=neto; totTk+=(d.tk||0);
     if(gf>0) mesesConGf++;
-    return {year:s.year,month:s.month,vn,cb,gf,neto,mb,rent};
+    return {year:s.year,month:s.month,vn,cb,gf,neto,mb,rent,inf,rentReal};
   });
 
   const totMb=totVn?(totVn-totCb)/totVn:0;
@@ -511,6 +528,8 @@ function drawAnual(){
       <td style="${tdStyle};color:${r.neto>=0?'var(--sage)':'var(--rust)'}">${r.gf>0?fmt(r.neto):'<span style="color:var(--muted);font-size:.75rem">sin gastos</span>'}</td>
       <td style="${tdStyle};color:${r.rent>=.1?'var(--sage)':r.rent>0?'var(--gold)':'var(--rust)'}">${r.gf>0?fp(r.rent):'—'}</td>
       <td style="${tdStyle};color:${r.mb>=.35?'var(--sage)':'var(--gold)'}">${fp(r.mb)}</td>
+      <td style="${tdStyle};color:var(--muted)">${r.inf?fp(r.inf/100):'—'}</td>
+      <td style="${tdStyle};color:${r.rentReal===null?'var(--muted)':r.rentReal>0?'var(--sage)':'var(--rust)'}">${r.rentReal!==null?fp(r.rentReal):'—'}</td>
     `;
     bodyEl.appendChild(tr);
   });
@@ -524,7 +543,8 @@ function drawAnual(){
     <td style="${tdSt}">${fmt(totVn)}</td>
     <td style="${tdSt};color:${totNeto>=0?'var(--sage)':'var(--rust)'}">${mesesConGf>0?fmt(totNeto):'—'}</td>
     <td style="${tdSt};color:${totRent>=.1?'var(--sage)':totRent>0?'var(--gold)':'var(--rust)'}">${mesesConGf>0?fp(totRent):'—'}</td>
-    <td style="${tdSt};color:${totMb>=.35?'var(--sage)':'var(--gold)'}">${fp(totMb)}</td>
+    <td style="${tdSt};color:var(--muted)">—</td>
+    <td style="${tdSt};color:var(--muted)">—</td>
   `;
   bodyEl.appendChild(trTot);
 }
@@ -748,13 +768,18 @@ function drawMonthlyBars(curVn,curCb,curGf){
 }
 
 // ── INSIGHTS ──────────────────────────────────────────────────────────────────
-function drawInsights(vn,cb,benBruto,neto,mb,rent,be,gf,tk,re,de){
+function drawInsights(vn,cb,benBruto,neto,mb,rent,be,gf,tk,re,de,inf,rentReal){
   const box=$('insights'); box.innerHTML='';
   if(!vn){
     box.innerHTML='<div class="insight-item" style="grid-column:1/-1"><div class="insight-icon">🌱</div><div class="insight-text">Cargá los datos del mes para ver los insights</div></div>';
     return;
   }
   const tips=[];
+  // inflación
+  if(inf&&rentReal!==null){
+    if(rentReal>0) tips.push({i:'📉',t:`Inflación del mes: <strong>${fp(inf/100)}</strong>. Rentabilidad real: <strong>${fp(rentReal)}</strong> (nominal ${fp(rent)} − inflación ${fp(inf/100)}). Tu ganancia <strong>sí le ganó a la inflación</strong>.`});
+    else tips.push({i:'🔥',t:`Inflación del mes: <strong>${fp(inf/100)}</strong>. Rentabilidad real: <strong>${fp(rentReal)}</strong>. Tu ganancia nominal (${fp(rent)}) <strong>no le ganó a la inflación</strong>. En términos reales perdiste poder adquisitivo.`});
+  }
   if(rent>.15)      tips.push({i:'🎉',t:`<strong>Rentabilidad excelente:</strong> ${fp(rent)} neto. El retail saludable promedia 10-20%.`});
   else if(rent>.07) tips.push({i:'✅',t:`Rentabilidad del ${fp(rent)}. Estás en zona sana. Meta: superar el 15%.`});
   else if(rent>0)   tips.push({i:'⚠️',t:`Rentabilidad baja: ${fp(rent)}. Cualquier imprevisto puede generar pérdida.`});
@@ -790,27 +815,71 @@ function drawInsights(vn,cb,benBruto,neto,mb,rent,be,gf,tk,re,de){
   });
 }
 
+// ── FETCH INFLACIÓN INDEC ─────────────────────────────────────────────────────
+async function fetchInflacion(){
+  const btn=$('inf-btn'), status=$('inf-status');
+  btn.textContent='⏳'; btn.disabled=true;
+  status.textContent='buscando...';
+  try {
+    // Serie INDEC: variación mensual IPC GBA Nivel General
+    // Traemos los últimos 3 meses para encontrar el del mes seleccionado
+    const url='https://apis.datos.gob.ar/series/api/series/?ids=101.1_I2NG_2016_M_19&limit=6&sort=desc&format=json';
+    const res=await fetch(url);
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const json=await res.json();
+    const data=json.data; // [[fecha, valor], ...]
+    if(!data||!data.length) throw new Error('sin datos');
+
+    // Buscar el mes seleccionado (selectedYear, selectedMonth 0-based)
+    // Las fechas vienen como "YYYY-MM-01"
+    const targetMonth=String(selectedMonth+1).padStart(2,'0');
+    const targetPrefix=`${selectedYear}-${targetMonth}`;
+    let found=data.find(d=>d[0].startsWith(targetPrefix));
+
+    // Si no encontramos ese mes exacto, tomamos el más reciente disponible
+    if(!found) found=data[0];
+
+    if(!found||found[1]===null) throw new Error('mes no disponible');
+
+    const val=parseFloat((found[1]*100).toFixed(2));
+    $('i-inf').value=val;
+    const [year,mon]=found[0].split('-');
+    status.textContent=`✓ INDEC ${MONTHS[parseInt(mon)-1]} ${year}`;
+    status.style.color='var(--sage-lt)';
+    recalc();
+  } catch(e) {
+    status.textContent='⚠ no disponible — ingresalo manual';
+    status.style.color='rgba(255,180,100,.8)';
+    console.warn('fetchInflacion error:',e);
+  } finally {
+    btn.textContent='🔄 INDEC'; btn.disabled=false;
+  }
+}
+
 // ── RECALC ────────────────────────────────────────────────────────────────────
 function recalc(){
   const vb=fv('i-vb'),re=fv('i-re'),de=fv('i-de'),cb=fv('i-cb'),tk=fv('i-tk');
   const vn=vb-re-de;
-  const al=fv('i-al'),su=fv('i-su'),se=fv('i-se'),ot=fv('i-ot');
+  const al=fv('i-al'),su=fv('i-su'),se=fv('i-se'),ot=fv('i-ot'),inf=fv('i-inf');
   const gf=al+su+se+ot;
   const benBruto=vn-cb, neto=benBruto-gf;
   const mb=vn?benBruto/vn:0, rent=vn?neto/vn:0;
+  const rentReal=inf?rent-(inf/100):null;
 
   $('m-vn').textContent  = vn  ? fmt(vn)  : '—';
   $('m-cb').textContent  = cb  ? fmt(cb)  : '—';
   $('m-gf').textContent  = gf  ? fmt(gf)  : '—';
   $('m-neta').textContent= vn  ? fmt(neto): '—';
   $('m-rent').textContent= vn  ? fp(rent) : '—';
+  $('d-ticket').textContent = vn&&inf ? `Real: ${fp(rentReal)} (−${fp(inf/100)} inflación)` : vn?(gf?`incl. gastos fijos`:`sin gastos fijos aún`):'—';
+  $('d-ticket').className = vn&&inf ? (rentReal>0?'metric-delta up':'metric-delta down') : 'metric-delta neutral';
 
   $('d-vn').textContent  = vn&&tk?`${Math.round(tk)} tickets · prom. ${fmt(vn/tk)}`:'—';
   $('d-mb').textContent  = vn?`Margen bruto: ${fp(mb)}`:'Margen bruto: —';
   $('d-gf').textContent  = vn&&gf?`${fp(gf/vn)} sobre ventas`:gf?fmt(gf):'% sobre ventas: —';
   $('d-neta').textContent= vn?(neto>=0?'▲ Negocio rentable':'▼ Pérdida este mes'):'—';
   $('d-neta').className  = 'metric-delta '+(neto>=0?'up':'down');
-  $('d-ticket').textContent = vn?(gf?`incl. gastos fijos`:`sin gastos fijos aún`):'—';
+
 
   const be=mb>0?gf/mb:0, dias=vn>0?(be/vn)*30:0;
   $('be-valor').textContent=be?fmt(be):(gf?'(necesitás más datos)':'—');
@@ -823,7 +892,7 @@ function recalc(){
   drawBenchmarks(vn,cb,gf,neto);
   drawGastos(vn,al,su,se,ot);
   drawMonthlyBars(vn,cb,gf);
-  drawInsights(vn,cb,benBruto,neto,mb,rent,be,gf,tk,re,de);
+  drawInsights(vn,cb,benBruto,neto,mb,rent,be,gf,tk,re,de,inf,rentReal);
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
