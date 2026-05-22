@@ -180,14 +180,46 @@
     </div>
   </div>
 
-  <!-- FILA: waterfall + loyverse -->
+  <!-- FILA: rentabilidad anual + loyverse -->
   <div class="row-2-1">
+
     <div class="card">
-      <div class="card-title">Desglose financiero <span class="card-subtitle">de ventas brutas a ganancia neta</span></div>
-      <div class="chart-wrap">
-        <svg class="chart" id="waterfall" viewBox="0 0 560 230" preserveAspectRatio="xMidYMid meet"></svg>
+      <div class="card-title">Rentabilidad anual <span class="card-subtitle" id="anual-periodo">acumulado</span></div>
+
+      <!-- métricas anuales -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.9rem;margin-bottom:1.4rem" id="anual-metrics"></div>
+
+      <!-- barra de progreso anual -->
+      <div style="margin-bottom:1.2rem">
+        <div style="display:flex;justify-content:space-between;font-size:.8rem;margin-bottom:.35rem">
+          <span style="font-weight:500">Rentabilidad neta anual</span>
+          <span style="font-family:'DM Mono',monospace;color:var(--muted)" id="anual-rent-val">—</span>
+        </div>
+        <div style="height:10px;background:var(--parch);border-radius:100px;overflow:hidden">
+          <div id="anual-rent-bar" style="height:100%;border-radius:100px;transition:width .8s cubic-bezier(.16,1,.3,1);width:0%"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-family:'DM Mono',monospace;font-size:.65rem;color:var(--muted);margin-top:.3rem">
+          <span>0%</span><span>Objetivo 15%</span><span>20%</span>
+        </div>
+      </div>
+
+      <!-- tabla mes a mes -->
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse" id="anual-table">
+          <thead>
+            <tr>
+              <th style="font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:.35rem .6rem;text-align:left;border-bottom:1px solid var(--parch)">Mes</th>
+              <th style="font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:.35rem .6rem;text-align:right;border-bottom:1px solid var(--parch)">Ventas netas</th>
+              <th style="font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:.35rem .6rem;text-align:right;border-bottom:1px solid var(--parch)">Ganancia</th>
+              <th style="font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:.35rem .6rem;text-align:right;border-bottom:1px solid var(--parch)">Rent.</th>
+              <th style="font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:.35rem .6rem;text-align:right;border-bottom:1px solid var(--parch)">Margen bruto</th>
+            </tr>
+          </thead>
+          <tbody id="anual-body"></tbody>
+        </table>
       </div>
     </div>
+
     <div class="card">
       <div class="card-title">Resumen Loyverse</div>
       <div id="ticket-rows"></div>
@@ -393,6 +425,7 @@ function saveCurrentMonth(){
   badge.style.opacity='1';
   setTimeout(()=>badge.style.opacity='0',2000);
   drawTrackingTable();
+  drawAnual();
   drawMonthlyBars(data.vb-data.re-data.de,data.cb,data.al+data.su+data.se+data.ot);
 }
 
@@ -404,48 +437,96 @@ function clearCurrentMonth(){
   drawTrackingTable();
 }
 
-// ── WATERFALL ─────────────────────────────────────────────────────────────────
-function drawWaterfall(vb,re,de,vn,cb,benBruto,gf,neto){
-  const svg=$('waterfall'); svg.innerHTML=''; if(!vn)return;
-  const W=560,H=230,pad={l:55,r:15,t:20,b:40};
-  const cw=W-pad.l-pad.r,ch=H-pad.t-pad.b;
-  const items=[
-    {label:'V.Brutas', val:vb,       type:'pos',from:0},
-    {label:'Desc/Remb',val:-(re+de), type:'neg',from:vb},
-    {label:'V.Netas',  val:vn,       type:'tot',from:0},
-    {label:'C.Bienes', val:-cb,      type:'neg',from:vn},
-    {label:'B.Bruto',  val:benBruto, type:'tot',from:0},
-    {label:'G.Fijos',  val:-gf,      type:'neg',from:benBruto},
-    {label:'Ganancia', val:neto,     type:neto>=0?'tot':'neg',from:0},
-  ];
-  const allV=[0,vb,vn,vn-cb,benBruto,benBruto-gf,neto].filter(x=>!isNaN(x));
-  const maxV=Math.max(...allV),minV=Math.min(0,...allV),range=maxV-minV||1;
-  const sy=val=>pad.t+ch-((val-minV)/range)*ch;
-  const bw=cw/items.length-10;
-  const colors={pos:'#7a9e7e',neg:'#c1440e',tot:'#2d4a31'};
-  const zy=sy(0);
-  const zl=document.createElementNS('http://www.w3.org/2000/svg','line');
-  zl.setAttribute('x1',pad.l);zl.setAttribute('x2',W-pad.r);
-  zl.setAttribute('y1',zy);zl.setAttribute('y2',zy);
-  zl.setAttribute('stroke','#d0c8b8');zl.setAttribute('stroke-width','1');svg.appendChild(zl);
-  items.forEach((it,i)=>{
-    const x=pad.l+i*(cw/items.length)+5;
-    let y1,y2;
-    if(it.type==='tot'){y1=sy(Math.max(0,it.val));y2=sy(Math.min(0,it.val));}
-    else{y1=sy(Math.max(it.from,it.from+it.val));y2=sy(Math.min(it.from,it.from+it.val));}
-    const bh=Math.max(Math.abs(y2-y1),3),by=Math.min(y1,y2);
-    const rect=document.createElementNS('http://www.w3.org/2000/svg','rect');
-    rect.setAttribute('x',x);rect.setAttribute('y',by);rect.setAttribute('width',bw);rect.setAttribute('height',bh);
-    rect.setAttribute('rx',4);rect.setAttribute('fill',colors[it.type]);rect.setAttribute('class','wbar');svg.appendChild(rect);
-    const tv=document.createElementNS('http://www.w3.org/2000/svg','text');
-    tv.setAttribute('x',x+bw/2);tv.setAttribute('y',by-4);tv.setAttribute('text-anchor','middle');
-    tv.setAttribute('font-size','7.5');tv.setAttribute('fill','#6b5c4a');tv.setAttribute('font-family','DM Mono,monospace');
-    tv.textContent=fmt(it.val);svg.appendChild(tv);
-    const tl=document.createElementNS('http://www.w3.org/2000/svg','text');
-    tl.setAttribute('x',x+bw/2);tl.setAttribute('y',H-pad.b+14);tl.setAttribute('text-anchor','middle');
-    tl.setAttribute('font-size','8');tl.setAttribute('fill','#8a8070');tl.setAttribute('font-family','DM Sans,sans-serif');
-    tl.textContent=it.label;svg.appendChild(tl);
+// ── RENTABILIDAD ANUAL ────────────────────────────────────────────────────────
+function drawAnual(){
+  const saved=getAllSavedMonths();
+  const metricsEl=$('anual-metrics');
+  const bodyEl=$('anual-body');
+  const periodoEl=$('anual-periodo');
+  metricsEl.innerHTML=''; bodyEl.innerHTML='';
+
+  if(!saved.length){
+    metricsEl.innerHTML='<div style="grid-column:1/-1;color:var(--muted);font-size:.82rem">Guardá al menos un mes para ver el acumulado anual</div>';
+    return;
+  }
+
+  // Calcular totales
+  let totVn=0,totCb=0,totGf=0,totNeto=0,totTk=0,mesesConGf=0;
+  const rows=saved.map(s=>{
+    const d=s.data;
+    const vn=(d.vb||0)-(d.re||0)-(d.de||0);
+    const cb=d.cb||0,gf=(d.al||0)+(d.su||0)+(d.se||0)+(d.ot||0);
+    const neto=vn-cb-gf,mb=vn?(vn-cb)/vn:0,rent=vn?neto/vn:0;
+    totVn+=vn; totCb+=cb; totGf+=gf; totNeto+=neto; totTk+=(d.tk||0);
+    if(gf>0) mesesConGf++;
+    return {year:s.year,month:s.month,vn,cb,gf,neto,mb,rent};
   });
+
+  const totMb=totVn?(totVn-totCb)/totVn:0;
+  const totRent=totVn?totNeto/totVn:0;
+  const meses=saved.length;
+  const primerMes=MONTHS[saved[0].month].substring(0,3)+' '+saved[0].year;
+  const ultMes=MONTHS[saved[saved.length-1].month].substring(0,3)+' '+saved[saved.length-1].year;
+  periodoEl.textContent=`${primerMes} – ${ultMes} · ${meses} meses`;
+
+  // Tarjetas resumen
+  const cards=[
+    {lbl:'Ventas acumuladas',val:fmt(totVn),color:'var(--forest)'},
+    {lbl:'Ganancia acumulada',val:fmt(totNeto),color:totNeto>=0?'var(--sage)':'var(--rust)'},
+    {lbl:'Margen bruto prom.',val:fp(totMb),color:totMb>.35?'var(--sage)':'var(--gold)'},
+    {lbl:'Rentabilidad anual',val:fp(totRent),color:totRent>.1?'var(--sage)':totRent>0?'var(--gold)':'var(--rust)'},
+  ];
+  cards.forEach(c=>{
+    const d=document.createElement('div');
+    d.style.cssText='background:var(--parch);border-radius:11px;padding:.85rem;text-align:center';
+    d.innerHTML=`<div style="font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:.35rem">${c.lbl}</div>
+    <div style="font-family:'Playfair Display',serif;font-size:1.25rem;font-weight:700;color:${c.color}">${c.val}</div>`;
+    metricsEl.appendChild(d);
+  });
+
+  // Barra rentabilidad anual
+  const rentPct=Math.min(Math.max(totRent,0),0.25);
+  const barW=(rentPct/0.20)*100;
+  const barColor=totRent>=.15?'var(--sage)':totRent>=.08?'var(--gold)':'var(--rust)';
+  $('anual-rent-val').textContent=fp(totRent)+(mesesConGf<meses?' (faltan gastos fijos en algunos meses)':'');
+  $('anual-rent-bar').style.width=Math.min(barW,100)+'%';
+  $('anual-rent-bar').style.background=barColor;
+
+  // Tabla mes a mes
+  rows.forEach((r,i)=>{
+    const tr=document.createElement('tr');
+    const isActive=r.year===selectedYear&&r.month===selectedMonth;
+    if(isActive) tr.style.background='rgba(122,158,126,.08)';
+    // delta vs anterior
+    let delta='';
+    if(i>0&&rows[i-1].vn){
+      const d=(r.vn-rows[i-1].vn)/rows[i-1].vn;
+      delta=`<span style="font-size:.68rem;color:${d>=0?'var(--sage)':'var(--rust)'};margin-left:.3rem">${d>=0?'▲':'▼'}${fp(Math.abs(d))}</span>`;
+    }
+    const tdStyle='padding:.55rem .6rem;border-bottom:1px solid var(--parch);font-family:"DM Mono",monospace;font-size:.82rem;text-align:right';
+    const tdStyleL='padding:.55rem .6rem;border-bottom:1px solid var(--parch);font-size:.83rem;font-weight:600;color:var(--forest)';
+    tr.innerHTML=`
+      <td style="${tdStyleL}">${MONTHS[r.month].substring(0,3)} ${r.year}${isActive?' 👈':''}</td>
+      <td style="${tdStyle}">${fmt(r.vn)}${delta}</td>
+      <td style="${tdStyle};color:${r.neto>=0?'var(--sage)':'var(--rust)'}">${r.gf>0?fmt(r.neto):'<span style="color:var(--muted);font-size:.75rem">sin gastos</span>'}</td>
+      <td style="${tdStyle};color:${r.rent>=.1?'var(--sage)':r.rent>0?'var(--gold)':'var(--rust)'}">${r.gf>0?fp(r.rent):'—'}</td>
+      <td style="${tdStyle};color:${r.mb>=.35?'var(--sage)':'var(--gold)'}">${fp(r.mb)}</td>
+    `;
+    bodyEl.appendChild(tr);
+  });
+
+  // Fila totales
+  const trTot=document.createElement('tr');
+  trTot.style.background='var(--parch)';
+  const tdSt='padding:.6rem .6rem;font-family:"DM Mono",monospace;font-size:.82rem;text-align:right;font-weight:600';
+  trTot.innerHTML=`
+    <td style="${tdSt};text-align:left;color:var(--forest)">TOTAL</td>
+    <td style="${tdSt}">${fmt(totVn)}</td>
+    <td style="${tdSt};color:${totNeto>=0?'var(--sage)':'var(--rust)'}">${mesesConGf>0?fmt(totNeto):'—'}</td>
+    <td style="${tdSt};color:${totRent>=.1?'var(--sage)':totRent>0?'var(--gold)':'var(--rust)'}">${mesesConGf>0?fp(totRent):'—'}</td>
+    <td style="${tdSt};color:${totMb>=.35?'var(--sage)':'var(--gold)'}">${fp(totMb)}</td>
+  `;
+  bodyEl.appendChild(trTot);
 }
 
 // ── TICKET ROWS ───────────────────────────────────────────────────────────────
@@ -737,7 +818,7 @@ function recalc(){
   $('be-stock').textContent=vn?fp(cb/vn):'—';
   $('be-roi').textContent  =cb?fp(neto/cb):'—';
 
-  drawWaterfall(vb,re,de,vn,cb,benBruto,gf,neto);
+  drawAnual();
   drawTickets(vb,re,de,vn,cb,tk);
   drawBenchmarks(vn,cb,gf,neto);
   drawGastos(vn,al,su,se,ot);
