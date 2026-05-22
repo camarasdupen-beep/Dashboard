@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Raiden — Dashboard Financiero</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --sage:#7a9e7e; --sage-lt:#b5cdb7; --forest:#2d4a31;
+    --cream:#f5f0e8; --parch:#ede6d6; --bark:#6b5c4a;
+    --rust:#c1440e; --gold:#c9a84c; --charcoal:#1e1e1e;
+    --muted:#8a8070; --white:#fdfcfa;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charcoal);min-height:100vh}
+
+  header{background:var(--forest);padding:0 2.5rem;display:flex;align-items:center;justify-content:space-between;height:68px;position:sticky;top:0;z-index:100}
+  .logo{font-family:'Playfair Display',serif;color:var(--cream);font-size:1.55rem;font-weight:900;letter-spacing:.04em}
+  .logo span{color:var(--sage-lt)}
+  .header-right{display:flex;align-items:center;gap:.8rem}
+  .period-tabs{display:flex;gap:.35rem}
+  .period-tabs button{background:transparent;border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.6);font-family:'DM Mono',monospace;font-size:.72rem;padding:.3rem .75rem;border-radius:100px;cursor:pointer;transition:all .2s}
+  .period-tabs button.active,.period-tabs button:hover{background:var(--sage);border-color:var(--sage);color:var(--white)}
+
+  main{max-width:1200px;margin:0 auto;padding:2rem 2rem 4rem;display:grid;gap:1.4rem}
+
+  .metrics-row{display:grid;grid-template-columns:repeat(5,1fr);gap:1rem}
+  .metric-card{background:var(--white);border-radius:16px;padding:1.3rem 1.5rem;border:1px solid rgba(0,0,0,.06);position:relative;overflow:hidden;transition:transform .2s}
+  .metric-card:hover{transform:translateY(-2px)}
+  .metric-card::before{content:'';position:absolute;inset:0;opacity:.05;pointer-events:none}
+  .metric-card.green::before{background:var(--sage)}
+  .metric-card.amber::before{background:var(--gold)}
+  .metric-card.bark::before{background:var(--bark)}
+  .metric-card.blue::before{background:#4a7ca5}
+  .metric-label{font-family:'DM Mono',monospace;font-size:.63rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.4rem}
+  .metric-value{font-family:'Playfair Display',serif;font-size:1.55rem;font-weight:700;line-height:1;margin-bottom:.38rem}
+  .metric-delta{font-family:'DM Mono',monospace;font-size:.7rem}
+  .metric-delta.up{color:var(--sage)} .metric-delta.down{color:var(--rust)} .metric-delta.neutral{color:var(--muted)}
+  .metric-badge{position:absolute;top:.9rem;right:1rem;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.95rem}
+  .metric-badge.green{background:#e8f2e9} .metric-badge.amber{background:#fdf3dc}
+  .metric-badge.bark{background:#f2ece5}  .metric-badge.blue{background:#e4eef5}
+
+  .card{background:var(--white);border-radius:16px;padding:1.6rem;border:1px solid rgba(0,0,0,.06)}
+  .card-title{font-family:'Playfair Display',serif;font-size:1rem;font-weight:700;margin-bottom:1.2rem;color:var(--forest)}
+  .card-subtitle{font-size:.76rem;color:var(--muted);font-weight:400;margin-left:.4rem}
+
+  .row-2-1{display:grid;grid-template-columns:1.3fr 1fr;gap:1.4rem}
+  .row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1.4rem}
+
+  /* waterfall */
+  .chart-wrap{width:100%;overflow:hidden}
+  svg.chart{width:100%}
+  .wbar{transition:opacity .2s;cursor:default} .wbar:hover{opacity:.8}
+
+  /* ticket */
+  .ticket-row{display:flex;justify-content:space-between;align-items:baseline;padding:.58rem 0;border-bottom:1px solid var(--parch)}
+  .ticket-row:last-child{border-bottom:none}
+  .ticket-lbl{font-size:.83rem}
+  .ticket-val{font-family:'DM Mono',monospace;font-size:.85rem}
+
+  /* benchmarks */
+  .bench-item{margin-bottom:1rem}
+  .bench-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:.3rem}
+  .bench-name{font-size:.84rem;font-weight:500}
+  .bench-vals{display:flex;align-items:center;gap:.5rem}
+  .bench-actual{font-family:'DM Mono',monospace;font-size:.82rem;font-weight:600}
+  .bench-target{font-family:'DM Mono',monospace;font-size:.72rem;color:var(--muted)}
+  .bench-track{height:8px;background:var(--parch);border-radius:100px;overflow:visible;position:relative;margin-bottom:.25rem}
+  .bench-fill{height:100%;border-radius:100px;transition:width .7s cubic-bezier(.16,1,.3,1)}
+  .bench-marker{position:absolute;top:-3px;width:2px;height:14px;background:var(--forest);border-radius:1px}
+  .bench-status{font-size:.73rem;display:flex;align-items:center;gap:.3rem}
+
+  /* gastos */
+  .prog-wrap{margin-bottom:.8rem}
+  .prog-label{display:flex;justify-content:space-between;font-size:.8rem;margin-bottom:.27rem}
+  .prog-label span:first-child{font-weight:500}
+  .prog-label span:last-child{font-family:'DM Mono',monospace;color:var(--muted)}
+  .prog-track{height:6px;background:var(--parch);border-radius:100px;overflow:hidden}
+  .prog-fill{height:100%;border-radius:100px;transition:width .7s cubic-bezier(.16,1,.3,1)}
+
+  /* breakeven */
+  .be-grid{display:grid;grid-template-columns:1fr 1fr;gap:.8rem}
+  .be-item{background:var(--parch);border-radius:11px;padding:.9rem;text-align:center}
+  .be-value{font-family:'Playfair Display',serif;font-size:1.25rem;font-weight:700;color:var(--forest);margin-bottom:.18rem}
+  .be-label{font-size:.7rem;color:var(--muted)}
+
+  /* tracking table */
+  .track-table{width:100%;border-collapse:collapse}
+  .track-table th{font-family:'DM Mono',monospace;font-size:.63rem;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);padding:.4rem .7rem;text-align:right;border-bottom:1px solid var(--parch)}
+  .track-table th:first-child{text-align:left}
+  .track-table td{padding:.6rem .7rem;font-size:.83rem;border-bottom:1px solid var(--parch);text-align:right;font-family:'DM Mono',monospace}
+  .track-table td:first-child{text-align:left;font-family:'DM Sans',sans-serif;font-weight:600;color:var(--forest)}
+  .track-table tr:last-child td{border-bottom:none}
+  .track-table tr.active-row td{background:rgba(122,158,126,.08)}
+  .td-pos{color:var(--sage)} .td-neg{color:var(--rust)} .td-neu{color:var(--muted)}
+
+  /* monthly bars */
+  .bar-chart-area{display:flex;align-items:flex-end;gap:.5rem;height:120px}
+  .bar-group{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px}
+  .bars{display:flex;gap:3px;align-items:flex-end}
+  .bar{width:11px;border-radius:3px 3px 0 0;cursor:default;transition:opacity .2s} .bar:hover{opacity:.8}
+  .bar-label{font-family:'DM Mono',monospace;font-size:.58rem;color:var(--muted)}
+  .legend{display:flex;gap:.9rem;margin-bottom:.85rem;flex-wrap:wrap}
+  .legend-item{display:flex;align-items:center;gap:.35rem;font-size:.73rem;color:var(--muted)}
+  .legend-dot{width:7px;height:7px;border-radius:2px}
+
+  /* insights */
+  .insight-grid{display:grid;grid-template-columns:1fr 1fr;gap:.75rem}
+  .insight-item{display:flex;gap:.7rem;padding:.8rem;border-radius:11px;background:var(--parch);align-items:flex-start}
+  .insight-icon{font-size:1rem;flex-shrink:0}
+  .insight-text{font-size:.81rem;line-height:1.5}
+  .insight-text strong{color:var(--forest)}
+
+  /* inputs */
+  .inputs-card{background:var(--forest);border-radius:16px;padding:1.5rem}
+  .inputs-card .card-title{color:var(--sage-lt);margin-bottom:.8rem}
+  .sec-label{font-family:'DM Mono',monospace;font-size:.61rem;letter-spacing:.1em;text-transform:uppercase;color:var(--sage-lt);opacity:.65;margin-top:.85rem;margin-bottom:.5rem}
+  .ig2{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
+  .ig{display:flex;flex-direction:column;gap:.27rem}
+  .ig label{font-family:'DM Mono',monospace;font-size:.61rem;letter-spacing:.07em;text-transform:uppercase;color:var(--sage-lt);opacity:.8}
+  .ig input{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);border-radius:7px;color:var(--white);font-family:'DM Mono',monospace;font-size:.85rem;padding:.4rem .58rem;outline:none;transition:border-color .2s;width:100%}
+  .ig input:focus{border-color:var(--sage-lt)}
+  .ig input::placeholder{color:rgba(255,255,255,.22)}
+  .save-btn{margin-top:.9rem;width:100%;background:var(--sage);border:none;border-radius:8px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:.85rem;font-weight:500;padding:.58rem;cursor:pointer;transition:background .2s}
+  .save-btn:hover{background:var(--sage-lt);color:var(--forest)}
+  .clear-btn{margin-top:.4rem;width:100%;background:transparent;border:1px solid rgba(255,255,255,.2);border-radius:8px;color:rgba(255,255,255,.5);font-family:'DM Sans',sans-serif;font-size:.78rem;padding:.4rem;cursor:pointer;transition:all .2s}
+  .clear-btn:hover{border-color:var(--rust);color:var(--rust)}
+
+  /* saved badge */
+  .saved-badge{display:inline-block;font-family:'DM Mono',monospace;font-size:.65rem;color:var(--sage-lt);opacity:0;transition:opacity .4s;margin-left:.6rem}
+
+  @media(max-width:1050px){.metrics-row{grid-template-columns:repeat(3,1fr)}.row-2-1,.row-3{grid-template-columns:1fr 1fr}}
+  @media(max-width:680px){.metrics-row{grid-template-columns:1fr 1fr}.row-2-1,.row-3{grid-template-columns:1fr}.insight-grid{grid-template-columns:1fr}}
+  @media(max-width:400px){.metrics-row{grid-template-columns:1fr}header{padding:0 1rem}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Raiden<span>.</span></div>
+  <div class="header-right">
+    <div class="period-tabs" id="period-tabs"></div>
+  </div>
+</header>
+
+<main>
+
+  <!-- HERO -->
+  <div class="metrics-row">
+    <div class="metric-card green">
+      <div class="metric-badge green">🌿</div>
+      <div class="metric-label">Ventas netas</div>
+      <div class="metric-value" id="m-vn">—</div>
+      <div class="metric-delta neutral" id="d-vn">—</div>
+    </div>
+    <div class="metric-card bark">
+      <div class="metric-badge bark">📦</div>
+      <div class="metric-label">Costo de bienes</div>
+      <div class="metric-value" id="m-cb">—</div>
+      <div class="metric-delta neutral" id="d-mb">Margen bruto: —</div>
+    </div>
+    <div class="metric-card amber">
+      <div class="metric-badge amber">🏗️</div>
+      <div class="metric-label">Gastos fijos</div>
+      <div class="metric-value" id="m-gf">—</div>
+      <div class="metric-delta neutral" id="d-gf">% sobre ventas: —</div>
+    </div>
+    <div class="metric-card green">
+      <div class="metric-badge green">✅</div>
+      <div class="metric-label">Ganancia neta</div>
+      <div class="metric-value" id="m-neta">—</div>
+      <div class="metric-delta" id="d-neta">—</div>
+    </div>
+    <div class="metric-card blue">
+      <div class="metric-badge blue">📊</div>
+      <div class="metric-label">Rentabilidad</div>
+      <div class="metric-value" id="m-rent">—</div>
+      <div class="metric-delta neutral" id="d-ticket">—</div>
+    </div>
+  </div>
+
+  <!-- FILA: waterfall + loyverse -->
+  <div class="row-2-1">
+    <div class="card">
+      <div class="card-title">Desglose financiero <span class="card-subtitle">de ventas brutas a ganancia neta</span></div>
+      <div class="chart-wrap">
+        <svg class="chart" id="waterfall" viewBox="0 0 560 230" preserveAspectRatio="xMidYMid meet"></svg>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Resumen Loyverse</div>
+      <div id="ticket-rows"></div>
+    </div>
+  </div>
+
+  <!-- FILA: benchmarks + gastos + breakeven -->
+  <div class="row-3">
+
+    <div class="card">
+      <div class="card-title">Salud financiera 🩺 <span class="card-subtitle">vs benchmarks retail saludable</span></div>
+      <div id="benchmarks"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Gastos operativos <span class="card-subtitle">% sobre ventas netas</span></div>
+      <div id="gastos-progs"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Punto de equilibrio</div>
+      <div class="be-grid">
+        <div class="be-item"><div class="be-value" id="be-valor">—</div><div class="be-label">Ventas mínimas para no perder</div></div>
+        <div class="be-item"><div class="be-value" id="be-dias">—</div><div class="be-label">Días para cubrir gastos fijos</div></div>
+        <div class="be-item"><div class="be-value" id="be-stock">—</div><div class="be-label">Costo de bienes / ventas</div></div>
+        <div class="be-item"><div class="be-value" id="be-roi">—</div><div class="be-label">ROI sobre stock invertido</div></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- TRACKING HISTÓRICO -->
+  <div class="card">
+    <div class="card-title">Tracking mensual <span class="card-subtitle">histórico guardado</span></div>
+    <div style="overflow-x:auto">
+      <table class="track-table" id="track-table">
+        <thead>
+          <tr>
+            <th>Mes</th>
+            <th>Ventas netas</th>
+            <th>Costo bienes</th>
+            <th>Margen bruto</th>
+            <th>Gastos fijos</th>
+            <th>Ganancia neta</th>
+            <th>Rentabilidad</th>
+            <th>Tickets</th>
+            <th>Ticket prom.</th>
+          </tr>
+        </thead>
+        <tbody id="track-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- INPUTS + INSIGHTS -->
+  <div class="row-2-1">
+
+    <div class="inputs-card">
+      <div class="card-title">
+        Datos del mes
+        <span class="saved-badge" id="saved-badge">✓ guardado</span>
+      </div>
+
+      <div class="sec-label">📊 Datos de Loyverse</div>
+      <div class="ig2">
+        <div class="ig"><label>Ventas brutas ($)</label><input type="number" id="i-vb" placeholder="ej. 7.675.976" oninput="recalc()"></div>
+        <div class="ig"><label>Reembolsos ($)</label><input type="number" id="i-re" placeholder="ej. 14.200" oninput="recalc()"></div>
+        <div class="ig"><label>Descuentos ($)</label><input type="number" id="i-de" placeholder="ej. 107.167" oninput="recalc()"></div>
+        <div class="ig"><label>Costo de bienes ($)</label><input type="number" id="i-cb" placeholder="ej. 4.973.980" oninput="recalc()"></div>
+        <div class="ig"><label>Tickets emitidos</label><input type="number" id="i-tk" placeholder="ej. 326" oninput="recalc()"></div>
+      </div>
+
+      <div class="sec-label">🏗 Gastos operativos</div>
+      <div class="ig2">
+        <div class="ig"><label>Alquiler ($)</label><input type="number" id="i-al" placeholder="0" oninput="recalc()"></div>
+        <div class="ig"><label>Sueldos ($)</label><input type="number" id="i-su" placeholder="0" oninput="recalc()"></div>
+        <div class="ig"><label>Servicios ($)</label><input type="number" id="i-se" placeholder="0" oninput="recalc()"></div>
+        <div class="ig"><label>Otros ($)</label><input type="number" id="i-ot" placeholder="0" oninput="recalc()"></div>
+      </div>
+
+      <button class="save-btn" onclick="saveCurrentMonth()">💾 Guardar este mes</button>
+      <button class="clear-btn" onclick="clearCurrentMonth()">🗑 Borrar mes actual</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">💡 Insights</div>
+      <div class="insight-grid" id="insights"></div>
+    </div>
+
+  </div>
+
+</main>
+
+<script>
+// ── UTILS ─────────────────────────────────────────────────────────────────────
+const $=id=>document.getElementById(id);
+const fmt=n=>{
+  const a=Math.abs(n);
+  const s=n<0?'-':'';
+  if(a>=1e6) return s+'$'+(a/1e6).toFixed(2)+'M';
+  if(a>=1e3) return s+'$'+Math.round(a).toLocaleString('es-AR');
+  return s+'$'+Math.round(a);
+};
+const fp=n=>(n*100).toFixed(1)+'%';
+const fv=id=>parseFloat($(id).value)||0;
+
+// ── MESES ─────────────────────────────────────────────────────────────────────
+const MONTHS=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const SHORT=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+// Año y mes actuales
+const NOW=new Date();
+let currentYear=NOW.getFullYear();
+let currentMonth=NOW.getMonth(); // 0-based
+
+// ── STORAGE ───────────────────────────────────────────────────────────────────
+function storageKey(year,month){return `raiden_${year}_${String(month).padStart(2,'0')}`;}
+
+function loadMonth(year,month){
+  try{
+    const raw=localStorage.getItem(storageKey(year,month));
+    return raw?JSON.parse(raw):null;
+  }catch(e){return null;}
+}
+
+function saveMonth(year,month,data){
+  try{localStorage.setItem(storageKey(year,month),JSON.stringify(data));}catch(e){}
+}
+
+function deleteMonth(year,month){
+  try{localStorage.removeItem(storageKey(year,month));}catch(e){}
+}
+
+function getAllSavedMonths(){
+  const results=[];
+  try{
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i);
+      if(k&&k.startsWith('raiden_')){
+        const parts=k.split('_');
+        if(parts.length===3){
+          const y=parseInt(parts[1]),m=parseInt(parts[2]);
+          const data=JSON.parse(localStorage.getItem(k));
+          results.push({year:y,month:m,data});
+        }
+      }
+    }
+  }catch(e){}
+  results.sort((a,b)=>a.year!==b.year?a.year-b.year:a.month-b.month);
+  return results;
+}
+
+// ── SEED DATA (Abril con datos reales de Loyverse) ───────────────────────────
+function seedIfEmpty(){
+  const key=storageKey(2026,3); // Abril = mes 3 (0-based)
+  if(!localStorage.getItem(key)){
+    saveMonth(2026,3,{vb:7675976.20,re:14200,de:107167.23,cb:4973980.12,tk:326,al:0,su:0,se:0,ot:0});
+  }
+}
+
+// ── TABS DINÁMICOS ────────────────────────────────────────────────────────────
+let selectedYear=currentYear, selectedMonth=currentMonth;
+
+function buildTabs(){
+  const container=$('period-tabs');
+  container.innerHTML='';
+  // Mostrar últimos 6 meses
+  const tabs=[];
+  for(let i=5;i>=0;i--){
+    let d=new Date(currentYear,currentMonth-i,1);
+    tabs.push({year:d.getFullYear(),month:d.getMonth()});
+  }
+  tabs.forEach(t=>{
+    const btn=document.createElement('button');
+    btn.textContent=SHORT[t.month];
+    if(t.year!==currentYear) btn.textContent+=` '${String(t.year).slice(2)}`;
+    if(t.year===selectedYear&&t.month===selectedMonth) btn.classList.add('active');
+    btn.onclick=()=>{
+      selectedYear=t.year; selectedMonth=t.month;
+      document.querySelectorAll('.period-tabs button').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      loadIntoForm(selectedYear,selectedMonth);
+      recalc();
+    };
+    container.appendChild(btn);
+  });
+}
+
+function loadIntoForm(year,month){
+  const d=loadMonth(year,month)||{};
+  $('i-vb').value=d.vb||''; $('i-re').value=d.re||''; $('i-de').value=d.de||'';
+  $('i-cb').value=d.cb||''; $('i-tk').value=d.tk||'';
+  $('i-al').value=d.al||''; $('i-su').value=d.su||''; $('i-se').value=d.se||''; $('i-ot').value=d.ot||'';
+}
+
+function saveCurrentMonth(){
+  const data={
+    vb:fv('i-vb'),re:fv('i-re'),de:fv('i-de'),cb:fv('i-cb'),tk:fv('i-tk'),
+    al:fv('i-al'),su:fv('i-su'),se:fv('i-se'),ot:fv('i-ot'),
+  };
+  saveMonth(selectedYear,selectedMonth,data);
+  const badge=$('saved-badge');
+  badge.style.opacity='1';
+  setTimeout(()=>badge.style.opacity='0',2000);
+  drawTrackingTable();
+  drawMonthlyBars(data.vb-data.re-data.de,data.cb,data.al+data.su+data.se+data.ot);
+}
+
+function clearCurrentMonth(){
+  if(!confirm(`¿Borrar los datos de ${MONTHS[selectedMonth]} ${selectedYear}?`)) return;
+  deleteMonth(selectedYear,selectedMonth);
+  loadIntoForm(selectedYear,selectedMonth);
+  recalc();
+  drawTrackingTable();
+}
+
+// ── WATERFALL ─────────────────────────────────────────────────────────────────
+function drawWaterfall(vb,re,de,vn,cb,benBruto,gf,neto){
+  const svg=$('waterfall'); svg.innerHTML=''; if(!vn)return;
+  const W=560,H=230,pad={l:55,r:15,t:20,b:40};
+  const cw=W-pad.l-pad.r,ch=H-pad.t-pad.b;
+  const items=[
+    {label:'V.Brutas', val:vb,       type:'pos',from:0},
+    {label:'Desc/Remb',val:-(re+de), type:'neg',from:vb},
+    {label:'V.Netas',  val:vn,       type:'tot',from:0},
+    {label:'C.Bienes', val:-cb,      type:'neg',from:vn},
+    {label:'B.Bruto',  val:benBruto, type:'tot',from:0},
+    {label:'G.Fijos',  val:-gf,      type:'neg',from:benBruto},
+    {label:'Ganancia', val:neto,     type:neto>=0?'tot':'neg',from:0},
+  ];
+  const allV=[0,vb,vn,vn-cb,benBruto,benBruto-gf,neto].filter(x=>!isNaN(x));
+  const maxV=Math.max(...allV),minV=Math.min(0,...allV),range=maxV-minV||1;
+  const sy=val=>pad.t+ch-((val-minV)/range)*ch;
+  const bw=cw/items.length-10;
+  const colors={pos:'#7a9e7e',neg:'#c1440e',tot:'#2d4a31'};
+  const zy=sy(0);
+  const zl=document.createElementNS('http://www.w3.org/2000/svg','line');
+  zl.setAttribute('x1',pad.l);zl.setAttribute('x2',W-pad.r);
+  zl.setAttribute('y1',zy);zl.setAttribute('y2',zy);
+  zl.setAttribute('stroke','#d0c8b8');zl.setAttribute('stroke-width','1');svg.appendChild(zl);
+  items.forEach((it,i)=>{
+    const x=pad.l+i*(cw/items.length)+5;
+    let y1,y2;
+    if(it.type==='tot'){y1=sy(Math.max(0,it.val));y2=sy(Math.min(0,it.val));}
+    else{y1=sy(Math.max(it.from,it.from+it.val));y2=sy(Math.min(it.from,it.from+it.val));}
+    const bh=Math.max(Math.abs(y2-y1),3),by=Math.min(y1,y2);
+    const rect=document.createElementNS('http://www.w3.org/2000/svg','rect');
+    rect.setAttribute('x',x);rect.setAttribute('y',by);rect.setAttribute('width',bw);rect.setAttribute('height',bh);
+    rect.setAttribute('rx',4);rect.setAttribute('fill',colors[it.type]);rect.setAttribute('class','wbar');svg.appendChild(rect);
+    const tv=document.createElementNS('http://www.w3.org/2000/svg','text');
+    tv.setAttribute('x',x+bw/2);tv.setAttribute('y',by-4);tv.setAttribute('text-anchor','middle');
+    tv.setAttribute('font-size','7.5');tv.setAttribute('fill','#6b5c4a');tv.setAttribute('font-family','DM Mono,monospace');
+    tv.textContent=fmt(it.val);svg.appendChild(tv);
+    const tl=document.createElementNS('http://www.w3.org/2000/svg','text');
+    tl.setAttribute('x',x+bw/2);tl.setAttribute('y',H-pad.b+14);tl.setAttribute('text-anchor','middle');
+    tl.setAttribute('font-size','8');tl.setAttribute('fill','#8a8070');tl.setAttribute('font-family','DM Sans,sans-serif');
+    tl.textContent=it.label;svg.appendChild(tl);
+  });
+}
+
+// ── TICKET ROWS ───────────────────────────────────────────────────────────────
+function drawTickets(vb,re,de,vn,cb,tk){
+  const el=$('ticket-rows'); el.innerHTML='';
+  const rows=[
+    {lbl:'Ventas brutas',   val:fmt(vb),          bold:false,color:''},
+    {lbl:'− Reembolsos',    val:fmt(re),           bold:false,color:'var(--rust)'},
+    {lbl:'− Descuentos',    val:fmt(de),           bold:false,color:'var(--rust)'},
+    {lbl:'= Ventas netas',  val:fmt(vn),           bold:true, color:'var(--forest)'},
+    {lbl:'Costo de bienes', val:fmt(cb),           bold:false,color:''},
+    {lbl:'Beneficio bruto', val:fmt(vn-cb),        bold:true, color:'var(--forest)'},
+    {lbl:'Margen bruto',    val:fp(vn?(vn-cb)/vn:0), bold:false,color:'var(--sage)'},
+    {lbl:'Tickets emitidos',val:Math.round(tk||0).toLocaleString('es-AR'), bold:false,color:''},
+    {lbl:'Ticket promedio', val:tk?fmt(vn/tk):'—', bold:false,color:''},
+  ];
+  rows.forEach(r=>{
+    const d=document.createElement('div'); d.className='ticket-row';
+    d.innerHTML=`<span class="ticket-lbl" style="${r.bold?'font-weight:700;color:var(--forest)':''}">${r.lbl}</span>
+    <span class="ticket-val" style="color:${r.color||'var(--charcoal)'}">${r.val}</span>`;
+    el.appendChild(d);
+  });
+}
+
+// ── BENCHMARKS ────────────────────────────────────────────────────────────────
+// Benchmarks para tienda de alimentos saludable / dietética
+const BENCHMARKS=[
+  {
+    name:'Costo de bienes / ventas',
+    desc:'Lo ideal para retail saludable es 55-65%',
+    get:(vn,cb,gf,neto)=>vn?cb/vn:null,
+    target:{min:0.55,max:0.65},
+    better:'lower', // menor es mejor
+    fmt:fp,
+    tips:{
+      good:'Tu costo de bienes está en el rango ideal. Comprás bien.',
+      high:'Costo de bienes alto. Alternativas: negociar volumen con proveedores, ajustar precios de venta un 5-10%, o eliminar productos de bajo margen.',
+      low:'Costo de bienes muy bajo — margen altísimo. Chequeá que los precios no estén fuera de mercado.',
+    }
+  },
+  {
+    name:'Margen bruto',
+    desc:'Objetivo: 35-45% para este tipo de tienda',
+    get:(vn,cb,gf,neto)=>vn?(vn-cb)/vn:null,
+    target:{min:0.35,max:0.45},
+    better:'higher',
+    fmt:fp,
+    tips:{
+      good:'Margen bruto saludable. Tenés buena diferencia entre lo que comprás y lo que vendés.',
+      high:'Margen excelente. Aprovechalo para invertir en marketing o bajar precios estratégicamente.',
+      low:'Margen bruto bajo. Cada peso vendido deja poco antes de pagar gastos fijos. Revisá precios y mix de productos.',
+    }
+  },
+  {
+    name:'Gastos fijos / ventas',
+    desc:'Objetivo: menos del 20% para ser sostenible',
+    get:(vn,cb,gf,neto)=>vn&&gf?gf/vn:null,
+    target:{min:0,max:0.20},
+    better:'lower',
+    fmt:fp,
+    tips:{
+      good:'Gastos fijos controlados. Buena proporción respecto a las ventas.',
+      high:'Gastos fijos altos. Cada mes arrancás con mucha presión. Revisá si podés renegociar alquiler o reducir algún gasto fijo.',
+      low:'Gastos fijos muy bajos. Si crecés, tené en cuenta que van a aumentar.',
+    }
+  },
+  {
+    name:'Rentabilidad neta',
+    desc:'Objetivo: 10-20% en retail saludable',
+    get:(vn,cb,gf,neto)=>vn&&gf?neto/vn:null,
+    target:{min:0.10,max:0.20},
+    better:'higher',
+    fmt:fp,
+    tips:{
+      good:'Rentabilidad neta en zona ideal. El negocio genera ganancia real.',
+      high:'Rentabilidad excelente. Podés reinvertir parte en crecimiento.',
+      low:'Rentabilidad baja o negativa. Revisá en conjunto costo de bienes y gastos fijos.',
+    }
+  },
+];
+
+function drawBenchmarks(vn,cb,gf,neto){
+  const wrap=$('benchmarks'); wrap.innerHTML='';
+  if(!vn){
+    wrap.innerHTML='<p style="color:var(--muted);font-size:.8rem">Ingresá los datos del mes para ver el análisis de salud financiera</p>';
+    return;
+  }
+  BENCHMARKS.forEach(b=>{
+    const actual=b.get(vn,cb,gf,neto);
+    if(actual===null){
+      // sin datos suficientes
+      const d=document.createElement('div'); d.className='bench-item';
+      d.innerHTML=`<div class="bench-header"><span class="bench-name">${b.name}</span><span class="bench-target">${b.desc}</span></div>
+      <div style="font-size:.75rem;color:var(--muted)">Ingresá gastos fijos para ver este indicador</div>`;
+      wrap.appendChild(d); return;
+    }
+    // determinar estado
+    let status, statusIcon, fillColor, tip;
+    const {min,max}=b.target;
+    if(b.better==='lower'){
+      if(actual<=max){status='Bien';statusIcon='🟢';fillColor='var(--sage)';tip=b.tips.good;}
+      else if(actual<=max*1.15){status='Mejorable';statusIcon='🟡';fillColor='var(--gold)';tip=b.tips.high;}
+      else{status='Alto';statusIcon='🔴';fillColor='var(--rust)';tip=b.tips.high;}
+    } else {
+      if(actual>=min){status='Bien';statusIcon='🟢';fillColor='var(--sage)';tip=b.tips.good;}
+      else if(actual>=min*0.75){status='Mejorable';statusIcon='🟡';fillColor='var(--gold)';tip=b.tips.low;}
+      else{status='Bajo';statusIcon='🔴';fillColor='var(--rust)';tip=b.tips.low;}
+      if(actual>max*1.2){status='Excelente';statusIcon='🟢';fillColor='var(--forest)';tip=b.tips.high;}
+    }
+    // barra: mapear al rango visual 0-100%
+    // usamos 0 a max*2 como escala visual
+    const scale=b.better==='lower'?max*2:max*1.5;
+    const fillW=Math.min(actual/scale*100,100);
+    const markerW=b.better==='lower'?max/scale*100:min/scale*100;
+    const marker2W=max/scale*100;
+
+    const d=document.createElement('div'); d.className='bench-item';
+    d.innerHTML=`
+      <div class="bench-header">
+        <span class="bench-name">${b.name}</span>
+        <div class="bench-vals">
+          <span class="bench-actual" style="color:${fillColor}">${b.fmt(actual)}</span>
+          <span class="bench-target">objetivo: ${b.fmt(min)}${max!==min?'–'+b.fmt(max):''}</span>
+        </div>
+      </div>
+      <div class="bench-track" style="margin-bottom:.3rem">
+        <div class="bench-fill" style="width:${fillW}%;background:${fillColor}"></div>
+        <div class="bench-marker" style="left:${markerW}%;opacity:.4"></div>
+        ${max!==min?`<div class="bench-marker" style="left:${marker2W}%;opacity:.4"></div>`:''}
+      </div>
+      <div class="bench-status">${statusIcon} <span style="color:${fillColor};font-weight:600">${status}</span> — <span style="color:var(--muted);font-size:.72rem">${tip}</span></div>
+    `;
+    wrap.appendChild(d);
+  });
+}
+
+// ── GASTOS ────────────────────────────────────────────────────────────────────
+function drawGastos(vn,al,su,se,ot){
+  const wrap=$('gastos-progs'); wrap.innerHTML='';
+  const items=[['Alquiler',al,'#c9a84c'],['Sueldos',su,'#7a9e7e'],['Servicios',se,'#6b5c4a'],['Otros',ot,'#b08070']];
+  let shown=0;
+  items.forEach(([lbl,val,color])=>{
+    if(!val)return; shown++;
+    const pct=vn?val/vn:0;
+    const d=document.createElement('div'); d.className='prog-wrap';
+    d.innerHTML=`<div class="prog-label"><span>${lbl}</span><span>${fp(pct)} · ${fmt(val)}</span></div>
+    <div class="prog-track"><div class="prog-fill" style="width:${Math.min(pct*100,100)}%;background:${color}"></div></div>`;
+    wrap.appendChild(d);
+  });
+  if(!shown) wrap.innerHTML='<p style="color:var(--muted);font-size:.8rem;padding:.4rem 0">Ingresá gastos operativos para ver el análisis</p>';
+}
+
+// ── TRACKING TABLE ────────────────────────────────────────────────────────────
+function drawTrackingTable(){
+  const body=$('track-body'); body.innerHTML='';
+  const saved=getAllSavedMonths();
+  if(!saved.length){
+    body.innerHTML='<tr><td colspan="9" style="text-align:center;color:var(--muted);font-size:.8rem;padding:1.2rem">Guardá el primer mes para empezar el tracking</td></tr>';
+    return;
+  }
+  saved.forEach((s,idx)=>{
+    const d=s.data;
+    const vn=(d.vb||0)-(d.re||0)-(d.de||0);
+    const cb=d.cb||0,gf=(d.al||0)+(d.su||0)+(d.se||0)+(d.ot||0);
+    const neto=vn-cb-gf, mb=vn?(vn-cb)/vn:0, rent=vn?neto/vn:0;
+    const isActive=s.year===selectedYear&&s.month===selectedMonth;
+    // vs mes anterior
+    let vsStr='—';
+    if(idx>0){
+      const prev=saved[idx-1].data;
+      const prevVn=(prev.vb||0)-(prev.re||0)-(prev.de||0);
+      if(prevVn){const delta=(vn-prevVn)/prevVn;vsStr=(delta>=0?'▲':'▼')+fp(Math.abs(delta));}
+    }
+    const tr=document.createElement('tr');
+    if(isActive) tr.className='active-row';
+    tr.innerHTML=`
+      <td>${MONTHS[s.month].substring(0,3)} ${s.year}</td>
+      <td>${vn?fmt(vn):'—'} <span class="${vn?(idx>0&&parseFloat(vsStr.replace(/[▲▼%]/g,''))>=0?'td-pos':'td-neg'):'td-neu'}" style="font-size:.7rem">${vsStr}</span></td>
+      <td>${cb?fmt(cb):'—'}</td>
+      <td class="${mb>.35?'td-pos':mb>.25?'':'td-neg'}">${vn?fp(mb):'—'}</td>
+      <td>${gf?fmt(gf):'<span class="td-neu">sin datos</span>'}</td>
+      <td class="${neto>0?'td-pos':'td-neg'}">${vn?fmt(neto):'—'}</td>
+      <td class="${rent>.1?'td-pos':rent>0?'':'td-neg'}">${vn?fp(rent):'—'}</td>
+      <td>${d.tk?Math.round(d.tk).toLocaleString('es-AR'):'—'}</td>
+      <td>${d.tk&&vn?fmt(vn/d.tk):'—'}</td>
+    `;
+    body.appendChild(tr);
+  });
+}
+
+// ── MONTHLY BARS ──────────────────────────────────────────────────────────────
+function drawMonthlyBars(curVn,curCb,curGf){
+  const cont=$('monthly-bars'); if(!cont) return;
+  cont.innerHTML='';
+  const saved=getAllSavedMonths().slice(-6);
+  // incluir mes actual si no está guardado
+  const hasActive=saved.find(s=>s.year===selectedYear&&s.month===selectedMonth);
+  const months=saved.map(s=>{
+    const d=s.data;
+    const vn=(d.vb||0)-(d.re||0)-(d.de||0);
+    return {label:SHORT[s.month],vn,cb:d.cb||0,gf:(d.al||0)+(d.su||0)+(d.se||0)+(d.ot||0),active:s.year===selectedYear&&s.month===selectedMonth};
+  });
+  if(!hasActive&&(curVn||curCb)){
+    months.push({label:SHORT[selectedMonth],vn:curVn,cb:curCb,gf:curGf,active:true});
+  }
+  if(!months.length) return;
+  const maxV=Math.max(...months.map(m=>m.vn),1),H=100;
+  months.forEach(m=>{
+    const g=Math.max(m.vn-m.cb-m.gf,0);
+    const hV=(m.vn/maxV)*H,hC=(m.cb/maxV)*H,hG=(g/maxV)*H;
+    const grp=document.createElement('div'); grp.className='bar-group';
+    grp.innerHTML=`<div class="bars">
+      <div class="bar" style="height:${hV}px;background:var(--sage);${m.active?'outline:2px solid var(--forest)':''}" title="Ventas: ${fmt(m.vn)}"></div>
+      <div class="bar" style="height:${hC}px;background:var(--bark)" title="C.Bienes: ${fmt(m.cb)}"></div>
+      <div class="bar" style="height:${hG}px;background:var(--gold)" title="Ganancia: ${fmt(g)}"></div>
+    </div><div class="bar-label">${m.label}</div>`;
+    cont.appendChild(grp);
+  });
+}
+
+// ── INSIGHTS ──────────────────────────────────────────────────────────────────
+function drawInsights(vn,cb,benBruto,neto,mb,rent,be,gf,tk,re,de){
+  const box=$('insights'); box.innerHTML='';
+  if(!vn){
+    box.innerHTML='<div class="insight-item" style="grid-column:1/-1"><div class="insight-icon">🌱</div><div class="insight-text">Cargá los datos del mes para ver los insights</div></div>';
+    return;
+  }
+  const tips=[];
+  if(rent>.15)      tips.push({i:'🎉',t:`<strong>Rentabilidad excelente:</strong> ${fp(rent)} neto. El retail saludable promedia 10-20%.`});
+  else if(rent>.07) tips.push({i:'✅',t:`Rentabilidad del ${fp(rent)}. Estás en zona sana. Meta: superar el 15%.`});
+  else if(rent>0)   tips.push({i:'⚠️',t:`Rentabilidad baja: ${fp(rent)}. Cualquier imprevisto puede generar pérdida.`});
+  else if(vn&&!gf)  tips.push({i:'ℹ️',t:`Cargá los gastos fijos para ver la ganancia neta real. El beneficio bruto es ${fmt(benBruto)}.`});
+  else              tips.push({i:'🚨',t:`<strong>Pérdida neta de ${fmt(Math.abs(neto))}.</strong> Los gastos superan el beneficio bruto.`});
+
+  if(mb>.4)  tips.push({i:'💚',t:`Margen bruto ${fp(mb)}: sólido. Por cada $100 vendidos, quedan $${Math.round(mb*100)} antes de gastos fijos.`});
+  else if(mb>.3) tips.push({i:'📦',t:`Margen bruto del ${fp(mb)}. Para mejorar: subí precios un 5-8% o negociá volumen con proveedores.`});
+  else       tips.push({i:'📉',t:`Margen bruto bajo: ${fp(mb)}. El costo de bienes consume demasiado. Objetivo: llegar al 35-40%.`});
+
+  const cbPct=vn?cb/vn:0;
+  if(cbPct>0.68) tips.push({i:'🛒',t:`El costo de bienes es el ${fp(cbPct)} de tus ventas. Tratá de bajarlo al 60-65%: eso equivaldría a ${fmt((cbPct-0.62)*vn)} más de ganancia bruta este mes.`});
+
+  if(tk>0) tips.push({i:'🧾',t:`Ticket promedio: <strong>${fmt(vn/tk)}</strong>. Para subir ganancia sin más clientes, intentá aumentarlo un 10% → ${fmt(vn/tk*1.1)} por ticket.`});
+
+  const saved=getAllSavedMonths();
+  if(saved.length>=2){
+    const prev=saved[saved.length-2].data;
+    const prevVn=(prev.vb||0)-(prev.re||0)-(prev.de||0);
+    if(prevVn&&vn){
+      const delta=(vn-prevVn)/prevVn;
+      tips.push({i:delta>=0?'📈':'📉',t:`Ventas ${delta>=0?'arriba':'abajo'} un ${fp(Math.abs(delta))} vs el mes anterior (${fmt(prevVn)}).`});
+    }
+  }
+
+  if(gf) tips.push({i:'💰',t:`Punto de equilibrio: <strong>${fmt(be)}</strong>. Tu colchón de seguridad actual es ${fmt(Math.max(vn-be,0))}.`});
+  tips.push({i:'🔄',t:`Antes de reponer stock (${fmt(cb)}), asegurate de tener cubiertos los gastos fijos del mes.`});
+
+  tips.slice(0,6).forEach(t=>{
+    const d=document.createElement('div'); d.className='insight-item';
+    d.innerHTML=`<div class="insight-icon">${t.i}</div><div class="insight-text">${t.t}</div>`;
+    box.appendChild(d);
+  });
+}
+
+// ── RECALC ────────────────────────────────────────────────────────────────────
+function recalc(){
+  const vb=fv('i-vb'),re=fv('i-re'),de=fv('i-de'),cb=fv('i-cb'),tk=fv('i-tk');
+  const vn=vb-re-de;
+  const al=fv('i-al'),su=fv('i-su'),se=fv('i-se'),ot=fv('i-ot');
+  const gf=al+su+se+ot;
+  const benBruto=vn-cb, neto=benBruto-gf;
+  const mb=vn?benBruto/vn:0, rent=vn?neto/vn:0;
+
+  $('m-vn').textContent  = vn  ? fmt(vn)  : '—';
+  $('m-cb').textContent  = cb  ? fmt(cb)  : '—';
+  $('m-gf').textContent  = gf  ? fmt(gf)  : '—';
+  $('m-neta').textContent= vn  ? fmt(neto): '—';
+  $('m-rent').textContent= vn  ? fp(rent) : '—';
+
+  $('d-vn').textContent  = vn&&tk?`${Math.round(tk)} tickets · prom. ${fmt(vn/tk)}`:'—';
+  $('d-mb').textContent  = vn?`Margen bruto: ${fp(mb)}`:'Margen bruto: —';
+  $('d-gf').textContent  = vn&&gf?`${fp(gf/vn)} sobre ventas`:gf?fmt(gf):'% sobre ventas: —';
+  $('d-neta').textContent= vn?(neto>=0?'▲ Negocio rentable':'▼ Pérdida este mes'):'—';
+  $('d-neta').className  = 'metric-delta '+(neto>=0?'up':'down');
+  $('d-ticket').textContent = vn?(gf?`incl. gastos fijos`:`sin gastos fijos aún`):'—';
+
+  const be=mb>0?gf/mb:0, dias=vn>0?(be/vn)*30:0;
+  $('be-valor').textContent=be?fmt(be):(gf?'(necesitás más datos)':'—');
+  $('be-dias').textContent =dias?Math.ceil(dias)+' días':'—';
+  $('be-stock').textContent=vn?fp(cb/vn):'—';
+  $('be-roi').textContent  =cb?fp(neto/cb):'—';
+
+  drawWaterfall(vb,re,de,vn,cb,benBruto,gf,neto);
+  drawTickets(vb,re,de,vn,cb,tk);
+  drawBenchmarks(vn,cb,gf,neto);
+  drawGastos(vn,al,su,se,ot);
+  drawMonthlyBars(vn,cb,gf);
+  drawInsights(vn,cb,benBruto,neto,mb,rent,be,gf,tk,re,de);
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+seedIfEmpty();
+buildTabs();
+// seleccionar el mes activo por defecto: abril 2026 si existe, sino el más reciente
+const abril=loadMonth(2026,3);
+if(abril){selectedYear=2026;selectedMonth=3;}
+buildTabs();
+loadIntoForm(selectedYear,selectedMonth);
+recalc();
+drawTrackingTable();
+</script>
+</body>
+</html>
