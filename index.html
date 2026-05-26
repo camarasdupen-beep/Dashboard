@@ -967,32 +967,48 @@ function loadCapitalForm(){
 
 async function fetchDolar(){
   try{
-    // Traemos los últimos ~180 días del dólar oficial
-    const url = 'https://api.estadisticasbcra.com/usd_of';
-    const res  = await fetch(url);
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    const data = await res.json(); // [{d:"YYYY-MM-DD", v:valor}, ...]
-    if(!data||!data.length) throw new Error('sin datos');
-
-    // Dólar actual = último valor disponible
-    dolarActual = data[data.length-1];
-
-    // Dólar al mes de inversión = último día de ese mes
-    const [y,m] = capitalData.mes.split('-');
-    const prefix = `${y}-${m}`;
-    // filtrar entradas de ese mes y tomar la última
-    const delMes = data.filter(d => d.d.startsWith(prefix));
-    if(delMes.length) dolarInicial = delMes[delMes.length-1];
-    else {
-      // si no hay datos exactos del mes, buscar el más cercano anterior
-      const antes = data.filter(d => d.d < prefix+'-31');
-      if(antes.length) dolarInicial = antes[antes.length-1];
+    // API oficial BCRA — cotizaciones por fecha, sin token
+    // 1. Dólar actual (hoy)
+    const hoy = new Date();
+    // retroceder hasta encontrar un día hábil (máx 7 intentos)
+    let dolarHoy = null;
+    for(let i=0; i<7; i++){
+      const d = new Date(hoy); d.setDate(d.getDate()-i);
+      const fecha = d.toISOString().split('T')[0];
+      try{
+        const r = await fetch(`https://api.bcra.gob.ar/estadisticascambiarias/v1.0/Cotizaciones?fecha=${fecha}`, {headers:{'accept':'application/json'}});
+        if(!r.ok) continue;
+        const j = await r.json();
+        const det = j?.results?.detalle || [];
+        const usd = det.find(x => x.codigoMoneda === 'USD');
+        if(usd){ dolarHoy = {d:fecha, v:usd.tipoCotizacion}; break; }
+      }catch(e){ continue; }
     }
 
+    // 2. Dólar al mes de inversión (último día hábil del mes)
+    const [y,m] = capitalData.mes.split('-');
+    let dolarMes = null;
+    const diasMes = new Date(parseInt(y), parseInt(m), 0).getDate();
+    for(let dia=diasMes; dia>=1; dia--){
+      const fecha = `${y}-${m}-${String(dia).padStart(2,'0')}`;
+      try{
+        const r = await fetch(`https://api.bcra.gob.ar/estadisticascambiarias/v1.0/Cotizaciones?fecha=${fecha}`, {headers:{'accept':'application/json'}});
+        if(!r.ok) continue;
+        const j = await r.json();
+        const det = j?.results?.detalle || [];
+        const usd = det.find(x => x.codigoMoneda === 'USD');
+        if(usd){ dolarMes = {d:fecha, v:usd.tipoCotizacion}; break; }
+      }catch(e){ continue; }
+    }
+
+    if(dolarHoy)  dolarActual  = dolarHoy;
+    if(dolarMes)  dolarInicial = dolarMes;
+
+    if(!dolarActual && !dolarInicial) throw new Error('sin datos');
     drawROI();
   }catch(e){
     console.warn('fetchDolar error:',e);
-    $('roi-dolar-badge').textContent = '⚠ TC no disponible — datos parciales';
+    $('roi-dolar-badge').textContent = '⚠ TC no disponible — ingresalo manual';
     drawROI();
   }
 }
