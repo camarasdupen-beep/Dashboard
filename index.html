@@ -1027,6 +1027,7 @@ function recalc(){
   $('be-stock').textContent=vn?fp(cb/vn):'—';
   $('be-roi').textContent  =cb?fp(neto/cb):'—';
 
+  drawBanner(vn,cb,gf,neto,rent,inf,rentReal);
   drawAnual();
   drawTickets(vb,re,de,vn,cb,tk);
   drawBenchmarks(vn,cb,gf,neto);
