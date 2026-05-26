@@ -146,7 +146,30 @@
 
 <main>
 
-  <!-- HERO -->
+  <!-- GANANCIA HERO BANNER -->
+  <div id="ganancia-banner" style="background:var(--forest);border-radius:18px;padding:1.6rem 2rem;display:grid;grid-template-columns:1fr auto;align-items:center;gap:2rem">
+    <div>
+      <div style="font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:var(--sage-lt);opacity:.7;margin-bottom:.5rem">
+        Ganancia neta del mes — lo que realmente queda
+      </div>
+      <div style="display:flex;align-items:baseline;gap:1rem;flex-wrap:wrap">
+        <div id="banner-neta" style="font-family:'Playfair Display',serif;font-size:3rem;font-weight:900;color:var(--white);line-height:1">—</div>
+        <div>
+          <div id="banner-rent" style="font-family:'DM Mono',monospace;font-size:1rem;color:var(--sage-lt);margin-bottom:.2rem">—% rentabilidad</div>
+          <div id="banner-real" style="font-family:'DM Mono',monospace;font-size:.78rem;color:rgba(255,255,255,.45)"></div>
+        </div>
+      </div>
+      <!-- barra de construcción de la ganancia -->
+      <div style="margin-top:1.2rem" id="banner-stack"></div>
+    </div>
+    <!-- veredicto -->
+    <div id="banner-veredicto" style="text-align:center;min-width:110px">
+      <div id="banner-emoji" style="font-size:2.8rem;line-height:1;margin-bottom:.4rem">⏳</div>
+      <div id="banner-estado" style="font-family:'DM Mono',monospace;font-size:.7rem;color:rgba(255,255,255,.5);letter-spacing:.06em;text-transform:uppercase"></div>
+    </div>
+  </div>
+
+  <!-- HERO MÉTRICAS -->
   <div class="metrics-row">
     <div class="metric-card green">
       <div class="metric-badge green">🌿</div>
@@ -441,6 +464,7 @@ function saveCurrentMonth(){
   badge.style.opacity='1';
   setTimeout(()=>badge.style.opacity='0',2000);
   drawTrackingTable();
+  drawBanner(vn,cb,gf,neto,rent,inf||0,rentReal);
   drawAnual();
   drawMonthlyBars(data.vb-data.re-data.de,data.cb,data.al+data.su+data.se+data.ot);
 }
@@ -887,6 +911,89 @@ async function fetchInflacion(){
   } finally {
     btn.textContent='🔄 INDEC'; btn.disabled=false;
   }
+}
+
+// ── BANNER GANANCIA ───────────────────────────────────────────────────────────
+function drawBanner(vn, cb, gf, neto, rent, inf, rentReal){
+  if(!vn){
+    $('banner-neta').textContent='—';
+    $('banner-rent').textContent='Cargá los datos del mes';
+    $('banner-real').textContent='';
+    $('banner-emoji').textContent='⏳';
+    $('banner-estado').textContent='sin datos';
+    $('banner-stack').innerHTML='';
+    return;
+  }
+
+  // Número grande
+  $('banner-neta').textContent=fmt(neto);
+  $('banner-neta').style.color=neto>=0?'var(--white)':'var(--rust)';
+  $('banner-rent').textContent=fp(rent)+' rentabilidad nominal';
+
+  if(rentReal!==null){
+    $('banner-real').textContent=`${fp(rentReal)} real (desc. inflación ${fp(inf/100)})`;
+  } else {
+    $('banner-real').textContent='Cargá inflación para ver rentabilidad real';
+  }
+
+  // Veredicto
+  let emoji, estado, estadoColor;
+  if(!gf){ emoji='⚠️'; estado='sin gastos fijos'; estadoColor='rgba(255,200,100,.8)'; }
+  else if(neto>0 && rent>=.15){ emoji='🚀'; estado='excelente'; estadoColor='var(--sage-lt)'; }
+  else if(neto>0 && rent>=.08){ emoji='✅'; estado='rentable'; estadoColor='var(--sage-lt)'; }
+  else if(neto>0){ emoji='⚠️'; estado='ajustado'; estadoColor='rgba(255,200,100,.8)'; }
+  else { emoji='🔴'; estado='pérdida'; estadoColor='var(--rust)'; }
+  $('banner-emoji').textContent=emoji;
+  $('banner-estado').textContent=estado;
+  $('banner-estado').style.color=estadoColor;
+
+  // Barra de construcción: ventas → -costo bienes → -gastos fijos = ganancia
+  const stack=$('banner-stack');
+  stack.innerHTML='';
+
+  if(!vn) return;
+  const total=vn;
+  const cbPct=Math.min(cb/total,1);
+  const gfPct=Math.min(gf/total,1);
+  const netoPct=Math.max(neto/total,0);
+  const perdPct=neto<0?Math.min(Math.abs(neto)/total,.3):0;
+
+  // Barra apilada horizontal
+  const barWrap=document.createElement('div');
+  barWrap.style.cssText='display:flex;height:10px;border-radius:6px;overflow:hidden;gap:2px;margin-bottom:.6rem';
+
+  const segments=[
+    {w:cbPct,color:'rgba(107,92,74,.7)',label:'C.Bienes'},
+    {w:gfPct,color:'rgba(201,168,76,.6)',label:'G.Fijos'},
+    {w:netoPct,color:'rgba(122,158,126,.9)',label:'Ganancia'},
+  ];
+  if(perdPct>0) segments[2]={w:perdPct,color:'rgba(193,68,14,.7)',label:'Pérdida'};
+
+  segments.forEach(s=>{
+    if(s.w<=0) return;
+    const seg=document.createElement('div');
+    seg.style.cssText=`flex:${s.w};background:${s.color};border-radius:3px`;
+    barWrap.appendChild(seg);
+  });
+  stack.appendChild(barWrap);
+
+  // Leyenda debajo
+  const legend=document.createElement('div');
+  legend.style.cssText='display:flex;gap:1.2rem;flex-wrap:wrap';
+  const items=[
+    {color:'rgba(107,92,74,.7)',  label:'Costo bienes', val:fmt(cb),  pct:fp(cbPct)},
+    {color:'rgba(201,168,76,.6)', label:'Gastos fijos', val:gf?fmt(gf):'sin datos', pct:gf?fp(gfPct):'—'},
+    {color:neto>=0?'rgba(122,158,126,.9)':'rgba(193,68,14,.7)', label:neto>=0?'Ganancia':'Pérdida', val:fmt(Math.abs(neto)), pct:fp(Math.abs(neto/total))},
+  ];
+  items.forEach(it=>{
+    const el=document.createElement('div');
+    el.style.cssText='display:flex;align-items:center;gap:.35rem';
+    el.innerHTML=`<div style="width:8px;height:8px;border-radius:2px;background:${it.color};flex-shrink:0"></div>
+    <span style="font-family:'DM Mono',monospace;font-size:.68rem;color:rgba(255,255,255,.5)">${it.label}: </span>
+    <span style="font-family:'DM Mono',monospace;font-size:.7rem;color:rgba(255,255,255,.8);font-weight:500">${it.val} <span style="opacity:.6">(${it.pct})</span></span>`;
+    legend.appendChild(el);
+  });
+  stack.appendChild(legend);
 }
 
 // ── RECALC ────────────────────────────────────────────────────────────────────
