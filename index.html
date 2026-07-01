@@ -502,6 +502,7 @@ function clearCurrentMonth(){
   if(!confirm(`¿Borrar los datos de ${MONTHS[selectedMonth]} ${selectedYear}?`)) return;
   deleteMonth(selectedYear,selectedMonth);
   loadIntoForm(selectedYear,selectedMonth);
+  loadEmpForm();
   recalc();
   drawTrackingTable();
 }
@@ -1233,10 +1234,91 @@ function recalc(){
   drawInsights(vn,cb,benBruto,neto,mb,rent,be,gf,tk,re,de,inf,rentReal);
 }
 
+// ── EMPLEADA ──────────────────────────────────────────────────────────────────
+function empKey(year, month){ return `raiden_emp_${year}_${String(month).padStart(2,'0')}`; }
+
+function loadEmpData(year, month){
+  try{
+    const raw = localStorage.getItem(empKey(year, month));
+    return raw ? JSON.parse(raw) : { sueldo:0, compras:0, descuento:15 };
+  }catch(e){ return { sueldo:0, compras:0, descuento:15 }; }
+}
+
+function saveEmpData(){
+  const data = {
+    sueldo:    parseFloat($('emp-sueldo').value)    || 0,
+    compras:   parseFloat($('emp-compras').value)   || 0,
+    descuento: parseFloat($('emp-descuento').value) || 15,
+  };
+  try{ localStorage.setItem(empKey(selectedYear, selectedMonth), JSON.stringify(data)); }catch(e){}
+  drawEmp();
+}
+
+function drawEmp(){
+  const data     = loadEmpData(selectedYear, selectedMonth);
+  const sueldo   = parseFloat($('emp-sueldo').value)    || data.sueldo    || 0;
+  const compras  = parseFloat($('emp-compras').value)   || data.compras   || 0;
+  const descPct  = (parseFloat($('emp-descuento').value)|| data.descuento || 15) / 100;
+
+  $('emp-mes-label').textContent = MONTHS[selectedMonth] + ' ' + selectedYear;
+
+  const descuento   = compras * descPct;       // beneficio de la empleada
+  const aDescontar  = compras - descuento;      // lo que paga = 85% del total
+  const sueldoNeto  = sueldo - aDescontar;      // lo que cobrá
+
+  const res = $('emp-resumen');
+  if(!sueldo && !compras){ res.innerHTML = '<p style="color:var(--muted);font-size:.82rem">Ingresá el sueldo bruto y el total de compras del mes</p>'; return; }
+
+  const filaStyle = 'display:flex;justify-content:space-between;align-items:baseline;padding:.55rem 0;border-bottom:1px solid rgba(0,0,0,.06)';
+  const lblStyle  = 'font-size:.85rem';
+  const valStyle  = 'font-family:"DM Mono",monospace;font-size:.88rem;font-weight:600';
+
+  res.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr auto;gap:1.5rem;align-items:start">
+      <div>
+        <div style="${filaStyle}">
+          <span style="${lblStyle}">Sueldo bruto</span>
+          <span style="${valStyle}">${fmt(sueldo)}</span>
+        </div>
+        <div style="${filaStyle}">
+          <span style="${lblStyle}">Total compras en tienda</span>
+          <span style="${valStyle}">${fmt(compras)}</span>
+        </div>
+        <div style="${filaStyle}">
+          <span style="${lblStyle}">Descuento ${Math.round(descPct*100)}% (beneficio empleada)</span>
+          <span style="${valStyle};color:var(--sage)">−${fmt(descuento)}</span>
+        </div>
+        <div style="${filaStyle}">
+          <span style="${lblStyle}">Descuenta del sueldo (${Math.round((1-descPct)*100)}% de compras)</span>
+          <span style="${valStyle};color:var(--rust)">−${fmt(aDescontar)}</span>
+        </div>
+      </div>
+      <div style="background:var(--forest);border-radius:12px;padding:1.1rem 1.4rem;text-align:center;min-width:160px">
+        <div style="font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--sage-lt);opacity:.8;margin-bottom:.4rem">A transferir</div>
+        <div style="font-family:'Playfair Display',serif;font-size:2rem;font-weight:900;color:${sueldoNeto>=0?'var(--white)':'var(--rust)'}">
+          ${fmt(sueldoNeto)}
+        </div>
+        <div style="font-family:'DM Mono',monospace;font-size:.68rem;color:rgba(255,255,255,.45);margin-top:.3rem">
+          ${sueldo?fp(sueldoNeto/sueldo)+' del bruto':''}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function loadEmpForm(){
+  const data = loadEmpData(selectedYear, selectedMonth);
+  if(data.sueldo)   $('emp-sueldo').value    = data.sueldo;
+  if(data.compras)  $('emp-compras').value   = data.compras;
+  if(data.descuento)$('emp-descuento').value = data.descuento;
+  drawEmp();
+}
+
 // ── INIT ──────────────────────────────────────────────────────────────────────
 seedIfEmpty();
 buildTabs();
 loadCapitalForm();
+loadEmpForm();
 // seleccionar el mes activo por defecto: abril 2026 si existe, sino el más reciente
 const abril=loadMonth(2026,3);
 if(abril){selectedYear=2026;selectedMonth=3;}
