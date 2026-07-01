@@ -379,6 +379,28 @@
 
   </div>
 
+  <!-- EMPLEADA -->
+  <div class="card">
+    <div class="card-title">👩‍💼 Liquidación mensual — empleada <span class="card-subtitle" id="emp-mes-label"></span></div>
+    <div style="background:var(--forest);border-radius:12px;padding:1.2rem 1.4rem;margin-bottom:1.4rem">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.8rem">
+        <div class="ig">
+          <label>Sueldo bruto ($)</label>
+          <input type="number" id="emp-sueldo" placeholder="ej. 400000" oninput="saveEmpData()">
+        </div>
+        <div class="ig">
+          <label>Total compras en tienda ($)</label>
+          <input type="number" id="emp-compras" placeholder="ej. 85000" oninput="saveEmpData()">
+        </div>
+        <div class="ig">
+          <label>% descuento empleada</label>
+          <input type="number" id="emp-descuento" value="15" min="0" max="100" oninput="saveEmpData()">
+        </div>
+      </div>
+    </div>
+    <div id="emp-resumen"></div>
+  </div>
+
 </main>
 
 <script>
